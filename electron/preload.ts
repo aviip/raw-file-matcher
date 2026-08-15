@@ -15,4 +15,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
     outputFolder: string,
   ) =>
     ipcRenderer.invoke("transfer-files", rawFiles, rawRootFolder, outputFolder),
+
+  onTransferProgress: (
+    callback: (progress: {
+      copiedFiles: number;
+      totalFiles: number;
+      copiedBytes: number;
+      totalBytes: number;
+      currentFile: string;
+    }) => void,
+  ) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      progress: {
+        copiedFiles: number;
+        totalFiles: number;
+        copiedBytes: number;
+        totalBytes: number;
+        currentFile: string;
+      },
+    ) => {
+      callback(progress);
+    };
+
+    ipcRenderer.on("transfer-progress", listener);
+
+    return () => {
+      ipcRenderer.removeListener("transfer-progress", listener);
+    };
+  },
 });

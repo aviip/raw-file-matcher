@@ -1,17 +1,37 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-export interface TransferResult {
-  copiedCount: number;
+export interface TransferProgress {
+  copiedFiles: number;
+  totalFiles: number;
+  copiedBytes: number;
   totalBytes: number;
+  currentFile: string;
+}
+
+export async function getTransferSize(rawFiles: string[]): Promise<number> {
+  let totalBytes = 0;
+
+  for (const rawFile of rawFiles) {
+    const stats = await fs.stat(rawFile);
+    totalBytes += stats.size;
+  }
+
+  return totalBytes;
 }
 
 export async function transferFiles(
   rawFiles: string[],
   rawRootFolder: string,
   outputFolder: string,
-): Promise<TransferResult> {
-  let totalBytes = 0;
+  onProgress: (progress: TransferProgress) => void,
+): Promise<void> {
+  const totalFiles = rawFiles.length;
+
+  const totalBytes = await getTransferSize(rawFiles);
+
+  let copiedFiles = 0;
+  let copiedBytes = 0;
 
   for (const rawFile of rawFiles) {
     const relativePath = path.relative(rawRootFolder, rawFile);
@@ -22,14 +42,19 @@ export async function transferFiles(
       recursive: true,
     });
 
+    const stats = await fs.stat(rawFile);
+
     await fs.copyFile(rawFile, destinationPath);
 
-    const stats = await fs.stat(rawFile);
-    totalBytes += stats.size;
-  }
+    copiedFiles += 1;
+    copiedBytes += stats.size;
 
-  return {
-    copiedCount: rawFiles.length,
-    totalBytes,
-  };
+    onProgress({
+      copiedFiles,
+      totalFiles,
+      copiedBytes,
+      totalBytes,
+      currentFile: rawFile,
+    });
+  }
 }

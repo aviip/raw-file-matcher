@@ -1,11 +1,6 @@
-import { ArrowRight, FileImage, FolderOpen } from "lucide-react";
-import { useState } from "react";
-
-interface RawFileMatch {
-  rawFile: string;
-  relativePath: string;
-  fileName: string;
-}
+import { ArrowRight, FolderOpen } from "lucide-react";
+import { useEffect, useState } from "react";
+import type { RawFileMatch, TransferProgress } from "./electron";
 
 function App() {
   const [rawFolder, setRawFolder] = useState("");
@@ -18,6 +13,11 @@ function App() {
   const [rawFiles, setRawFiles] = useState<string[]>([]);
   const [jpegFiles, setJpegFiles] = useState<string[]>([]);
   const [matchedFiles, setMatchedFiles] = useState<RawFileMatch[]>([]);
+
+  const [transferProgress, setTransferProgress] =
+    useState<TransferProgress | null>(null);
+
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const selectRawFolder = async () => {
     const folder = await window.electronAPI.selectFolder();
@@ -79,6 +79,14 @@ function App() {
 
     setMatchedFiles(matches);
   };
+
+  useEffect(() => {
+    const removeListener = window.electronAPI.onTransferProgress((progress) => {
+      setTransferProgress(progress);
+    });
+
+    return removeListener;
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -181,31 +189,35 @@ function App() {
           <button
             type="button"
             disabled={
+              isTransferring ||
               !rawFolder ||
               !jpegFolder ||
               !destinationFolder ||
               matchedFiles.length === 0
             }
-            className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             onClick={async () => {
               if (!rawFolder || !destinationFolder) {
                 return;
               }
 
+              setIsTransferring(true);
+              setTransferProgress(null);
+
               try {
-                const result = await window.electronAPI.transferFiles(
+                await window.electronAPI.transferFiles(
                   matchedFiles.map((match) => match.rawFile),
                   rawFolder,
                   destinationFolder,
                 );
-
-                console.log("TRANSFER RESULT:", result);
               } catch (error) {
                 console.error("TRANSFER FAILED:", error);
+              } finally {
+                setIsTransferring(false);
               }
             }}
+            className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Transfer
+            {isTransferring ? "Transferring..." : "Transfer"}
           </button>
         </div>
 
@@ -213,19 +225,59 @@ function App() {
         <div className="mt-10 rounded-xl border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Ready</p>
+              <p className="text-sm font-medium">
+                {isTransferring
+                  ? "Transferring files..."
+                  : transferProgress &&
+                      transferProgress.copiedFiles ===
+                        transferProgress.totalFiles
+                    ? "Transfer completed"
+                    : "Ready"}
+              </p>
 
               <p className="mt-1 text-xs text-muted-foreground">
-                Select your RAW, JPEG and output folders to begin.
+                {transferProgress
+                  ? `${transferProgress.copiedFiles.toLocaleString()} / ${transferProgress.totalFiles.toLocaleString()} files`
+                  : "Select your folders and transfer matching RAW files."}
               </p>
             </div>
 
-            <span className="text-sm font-medium">0%</span>
+            <span className="text-sm font-medium">
+              {transferProgress
+                ? `${Math.round(
+                    (transferProgress.copiedBytes /
+                      transferProgress.totalBytes) *
+                      100,
+                  )}%`
+                : "0%"}
+            </span>
           </div>
 
           <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-0 rounded-full bg-primary" />
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-200"
+              style={{
+                width: `${
+                  transferProgress
+                    ? Math.round(
+                        (transferProgress.copiedBytes /
+                          transferProgress.totalBytes) *
+                          100,
+                      )
+                    : 0
+                }%`,
+              }}
+            />
           </div>
+
+          {transferProgress && (
+            <p
+              className="mt-3 truncate text-xs text-muted-foreground"
+              title={transferProgress.currentFile}
+            >
+              Current: {transferProgress.currentFile}
+            </p>
+          )}
         </div>
       </div>
     </div>

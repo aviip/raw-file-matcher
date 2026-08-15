@@ -41,6 +41,15 @@ ipcMain.handle("select-folder", async () => {
 });
 
 ipcMain.handle(
+  "scan-folder",
+  async (_event, folderPath: string, type: "raw" | "jpeg") => {
+    const extensions = type === "raw" ? RAW_EXTENSIONS : JPEG_EXTENSIONS;
+
+    return findFiles(folderPath, extensions);
+  },
+);
+
+ipcMain.handle(
   "find-matches",
   async (
     _event,
@@ -53,23 +62,20 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  "scan-folder",
-  async (_event, folderPath: string, type: "raw" | "jpeg") => {
-    const extensions = type === "raw" ? RAW_EXTENSIONS : JPEG_EXTENSIONS;
-
-    return findFiles(folderPath, extensions);
-  },
-);
-
-ipcMain.handle(
   "transfer-files",
   async (
-    _event,
+    event,
     rawFiles: string[],
     rawRootFolder: string,
     outputFolder: string,
   ) => {
-    return transferFiles(rawFiles, rawRootFolder, outputFolder);
+    await transferFiles(rawFiles, rawRootFolder, outputFolder, (progress) => {
+      event.sender.send("transfer-progress", progress);
+    });
+
+    return {
+      success: true,
+    };
   },
 );
 

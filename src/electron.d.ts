@@ -1,5 +1,13 @@
 export {};
 
+export interface TransferProgress {
+  copiedFiles: number;
+  totalFiles: number;
+  copiedBytes: number;
+  totalBytes: number;
+  currentFile: string;
+}
+
 declare global {
   interface Window {
     electronAPI: {
@@ -21,14 +29,17 @@ declare global {
         rawRootFolder: string,
         outputFolder: string,
       ) => Promise<{
-        copiedCount: number;
-        totalBytes: number;
+        success: boolean;
       }>;
+
+      onTransferProgress: (
+        callback: (progress: TransferProgress) => void,
+      ) => () => void;
     };
   }
 }
 
-interface RawFileMatch {
+export interface RawFileMatch {
   rawFile: string;
   relativePath: string;
   fileName: string;
