@@ -1,5 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
 import path from "node:path";
+import { findFiles } from "./fileScanner";
+import { RAW_EXTENSIONS, JPEG_EXTENSIONS } from "./constants";
+import { findMatchingRawFiles } from "./fileMatcher";
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -35,6 +38,27 @@ ipcMain.handle("select-folder", async () => {
 
   return result.filePaths[0] ?? null;
 });
+
+ipcMain.handle(
+  "find-matches",
+  async (
+    _event,
+    rawFolder: string,
+    rawFiles: string[],
+    jpegFiles: string[],
+  ) => {
+    return findMatchingRawFiles(rawFiles, jpegFiles, rawFolder);
+  },
+);
+
+ipcMain.handle(
+  "scan-folder",
+  async (_event, folderPath: string, type: "raw" | "jpeg") => {
+    const extensions = type === "raw" ? RAW_EXTENSIONS : JPEG_EXTENSIONS;
+
+    return findFiles(folderPath, extensions);
+  },
+);
 
 app.whenReady().then(() => {
   createWindow();
