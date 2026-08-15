@@ -1,6 +1,11 @@
 import { ArrowRight, FileImage, FolderOpen } from "lucide-react";
 import { useState } from "react";
-import type { RawFileMatch } from "./electron";
+
+interface RawFileMatch {
+  rawFile: string;
+  relativePath: string;
+  fileName: string;
+}
 
 function App() {
   const [rawFolder, setRawFolder] = useState("");
@@ -26,15 +31,13 @@ function App() {
     setRawFiles(files);
     setRawFileCount(files.length);
 
-    setMatchedFiles([]);
+    await findMatches(files, jpegFiles, folder);
   };
 
   const selectJpegFolder = async () => {
     const folder = await window.electronAPI.selectFolder();
 
-    if (!folder) {
-      return;
-    }
+    if (!folder) return;
 
     setJpegFolder(folder);
 
@@ -43,7 +46,7 @@ function App() {
     setJpegFiles(files);
     setJpegFileCount(files.length);
 
-    setMatchedFiles([]);
+    await findMatches(rawFiles, files, rawFolder);
   };
 
   const selectDestinationFolder = async () => {
@@ -52,6 +55,29 @@ function App() {
     if (folder) {
       setDestinationFolder(folder);
     }
+  };
+
+  const findMatches = async (
+    currentRawFiles: string[],
+    currentJpegFiles: string[],
+    currentRawFolder: string,
+  ) => {
+    if (
+      !currentRawFiles.length ||
+      !currentJpegFiles.length ||
+      !currentRawFolder
+    ) {
+      setMatchedFiles([]);
+      return;
+    }
+
+    const matches = await window.electronAPI.findMatches(
+      currentRawFolder,
+      currentRawFiles,
+      currentJpegFiles,
+    );
+
+    setMatchedFiles(matches);
   };
 
   return (
@@ -108,76 +134,76 @@ function App() {
           />
         </div>
 
-        <button
-          type="button"
-          disabled={!rawFiles.length || !jpegFiles.length}
-          onClick={async () => {
-            if (!rawFolder) {
-              return;
-            }
+        {/* Matching explanation */}
+        <div className="mt-10 rounded-xl border bg-card p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Matching RAW files</p>
 
-            console.log("RAW STATE:", rawFiles);
-            console.log("JPEG STATE:", jpegFiles);
+              <p className="mt-1 text-xs text-muted-foreground">
+                RAW files whose filename matches a JPEG.
+              </p>
+            </div>
 
-            const matches = await window.electronAPI.findMatches(
-              rawFolder,
-              rawFiles,
-              jpegFiles,
-            );
-
-            console.log("MATCHES:", matches);
-            console.log("MATCH COUNT:", matches.length);
-
-            setMatchedFiles(matches);
-          }}
-          className="mt-6 rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Find Matches
-        </button>
+            <div className="text-2xl font-semibold">
+              {matchedFiles.length.toLocaleString()}
+            </div>
+          </div>
+        </div>
 
         {matchedFiles.length > 0 && (
-          <div className="mt-6 rounded-xl border bg-card p-5">
-            <p className="text-sm font-medium">
-              Matches found: {matchedFiles.length}
-            </p>
+          <div className="mt-4 overflow-hidden rounded-xl border bg-card">
+            <div className="border-b px-6 py-4">
+              <p className="text-sm font-medium">Files to transfer</p>
+            </div>
 
-            <div className="mt-4 max-h-60 overflow-auto rounded-lg bg-muted p-3">
+            <div className="max-h-64 overflow-y-auto">
               {matchedFiles.map((match) => (
-                <div key={match.rawFile} className="py-1 text-xs">
-                  {match.relativePath}
+                <div
+                  key={match.rawFile}
+                  className="border-b px-6 py-3 last:border-b-0"
+                >
+                  <p className="truncate text-sm font-medium">
+                    {match.fileName}
+                  </p>
+
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {match.relativePath}
+                  </p>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Matching explanation */}
-        <div className="mt-10 rounded-xl border bg-card p-5">
-          <div className="flex items-start gap-3">
-            <FileImage className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-
-            <div>
-              <p className="text-sm font-medium">How matching works</p>
-
-              <p className="mt-1 text-sm text-muted-foreground">
-                JPEG and RAW files are matched using their exact filename
-                without the extension.
-              </p>
-
-              <div className="mt-3 rounded-lg bg-muted px-4 py-3 font-mono text-xs">
-                <div>2.jpg → 2.ARW ✓</div>
-                <div>5.jpg → 5.ARW ✓</div>
-                <div>6.jpg → 6.ARW ✓</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Start */}
         <div className="mt-8 flex justify-end">
           <button
             type="button"
-            className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            disabled={
+              !rawFolder ||
+              !jpegFolder ||
+              !destinationFolder ||
+              matchedFiles.length === 0
+            }
+            className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={async () => {
+              if (!rawFolder || !destinationFolder) {
+                return;
+              }
+
+              try {
+                const result = await window.electronAPI.transferFiles(
+                  matchedFiles.map((match) => match.rawFile),
+                  rawFolder,
+                  destinationFolder,
+                );
+
+                console.log("TRANSFER RESULT:", result);
+              } catch (error) {
+                console.error("TRANSFER FAILED:", error);
+              }
+            }}
           >
             Transfer
           </button>

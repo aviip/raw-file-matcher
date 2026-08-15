@@ -8,4 +8,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   findMatches: (rawFolder: string, rawFiles: string[], jpegFiles: string[]) =>
     ipcRenderer.invoke("find-matches", rawFolder, rawFiles, jpegFiles),
+
+  transferFiles: (
+    rawFiles: string[],
+    rawRootFolder: string,
+    outputFolder: string,
+  ) =>
+    ipcRenderer.invoke("transfer-files", rawFiles, rawRootFolder, outputFolder),
 });

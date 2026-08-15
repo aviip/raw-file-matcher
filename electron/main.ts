@@ -3,6 +3,7 @@ import path from "node:path";
 import { findFiles } from "./fileScanner";
 import { RAW_EXTENSIONS, JPEG_EXTENSIONS } from "./constants";
 import { findMatchingRawFiles } from "./fileMatcher";
+import { transferFiles } from "./fileTransfer";
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -57,6 +58,18 @@ ipcMain.handle(
     const extensions = type === "raw" ? RAW_EXTENSIONS : JPEG_EXTENSIONS;
 
     return findFiles(folderPath, extensions);
+  },
+);
+
+ipcMain.handle(
+  "transfer-files",
+  async (
+    _event,
+    rawFiles: string[],
+    rawRootFolder: string,
+    outputFolder: string,
+  ) => {
+    return transferFiles(rawFiles, rawRootFolder, outputFolder);
   },
 );
 

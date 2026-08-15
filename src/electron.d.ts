@@ -15,11 +15,20 @@ declare global {
         rawFiles: string[],
         jpegFiles: string[],
       ) => Promise<RawFileMatch[]>;
+
+      transferFiles: (
+        rawFiles: string[],
+        rawRootFolder: string,
+        outputFolder: string,
+      ) => Promise<{
+        copiedCount: number;
+        totalBytes: number;
+      }>;
     };
   }
 }
 
-export interface RawFileMatch {
+interface RawFileMatch {
   rawFile: string;
   relativePath: string;
   fileName: string;
